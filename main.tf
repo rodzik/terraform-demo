@@ -57,3 +57,15 @@ module "db" {
   create_db_option_group = false
   create_db_parameter_group = false
 }
+
+module "demo-webserver" {
+  source = "./modules/webserver"
+  vpc_id = module.vpc.vpc_id
+  my_ip = var.my_ip
+  app_name = var.app_name
+  public_key_location = var.public_key_location
+  instance_type = var.instance_type
+  subnet_id = module.vpc.public_subnets[0]
+  avail_zone = var.azs[0]
+  image_name = "amzn2-ami-hvm-*-x86_64-gp2"
+}

@@ -4,3 +4,6 @@ variable "avail_zone" {}
 variable "public_subnet_cidr_block" {}
 variable "database_subnets" {}
 variable "azs" {}
+variable "my_ip" {}
+variable "public_key_location" {}
+variable "instance_type" {}

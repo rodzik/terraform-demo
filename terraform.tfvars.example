@@ -1,0 +1,9 @@
+app_name = "demo"
+vpc_cidr_block = "10.0.0.0/16"
+avail_zone = "eu-central-1a"
+public_subnet_cidr_block = "10.0.10.0/24"
+database_subnets = ["10.0.21.0/24", "10.0.22.0/24"]
+azs = ["eu-central-1a", "eu-central-1b"]
+my_ip = "87.99.9.42/32"
+public_key_location = "~/.ssh/id_rsa.pub"
+instance_type = "t2.micro"
