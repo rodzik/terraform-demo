@@ -26,9 +26,21 @@ resource "aws_internet_gateway" "internet_gateway" {
   }
 }
 
-resource "aws_subnet" "pub_subnet" {
+resource "aws_subnet" "pub_subnet1" {
   vpc_id                  = aws_vpc.vpc.id
   cidr_block              = "10.0.10.0/24"
+  availability_zone       = "eu-central-1a"
+
+  tags = {
+    Name = "${var.app_name}"
+  }
+}
+
+resource "aws_subnet" "pub_subnet2" {
+  vpc_id                  = aws_vpc.vpc.id
+  cidr_block              = "10.0.20.0/24"
+  availability_zone       = "eu-central-1b"
+
   tags = {
     Name = "${var.app_name}"
   }
@@ -47,8 +59,13 @@ resource "aws_route_table" "public" {
   }
 }
 
-resource "aws_route_table_association" "route_table_association" {
-  subnet_id      = aws_subnet.pub_subnet.id
+resource "aws_route_table_association" "route_table_association1" {
+  subnet_id      = aws_subnet.pub_subnet1.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "route_table_association2" {
+  subnet_id      = aws_subnet.pub_subnet2.id
   route_table_id = aws_route_table.public.id
 }
 
@@ -77,7 +94,7 @@ resource "aws_security_group" "ecs_sg" {
     }
 }
 
-resource "aws_security_group" "rdc_sg" {
+resource "aws_security_group" "rds_sg" {
     vpc_id      = aws_vpc.vpc.id
 
     ingress {
@@ -132,7 +149,7 @@ resource "aws_launch_configuration" "ecs_launch_config" {
 
 resource "aws_autoscaling_group" "failure_analysis_ecs_asg" {
     name                      = "asg"
-    vpc_zone_identifier       = [aws_subnet.pub_subnet.id]
+    vpc_zone_identifier       = [aws_subnet.pub_subnet1.id, aws_subnet.pub_subnet2.id]
     launch_configuration      = aws_launch_configuration.ecs_launch_config.name
 
     desired_capacity          = 1
@@ -140,4 +157,30 @@ resource "aws_autoscaling_group" "failure_analysis_ecs_asg" {
     max_size                  = 1
     health_check_grace_period = 300
     health_check_type         = "EC2"
+}
+
+resource "aws_db_subnet_group" "db_subnet_group" {
+    subnet_ids  = [aws_subnet.pub_subnet1.id, aws_subnet.pub_subnet2.id]
+}
+
+resource "aws_db_instance" "database" {
+    identifier                = "postgres"
+    allocated_storage         = 5
+    backup_retention_period   = 2
+    backup_window             = "01:00-01:30"
+    maintenance_window        = "sun:03:00-sun:03:30"
+    multi_az                  = false
+    engine                    = "postgres"
+    engine_version            = "13.4"
+    instance_class            = "db.t3.micro"
+    name                      = "${var.app_name}_db"
+    username                  = "username"
+    password                  = "password"
+    port                      = "5432"
+    db_subnet_group_name      = aws_db_subnet_group.db_subnet_group.id
+    vpc_security_group_ids    = [aws_security_group.rds_sg.id, aws_security_group.ecs_sg.id]
+    skip_final_snapshot       = true
+    final_snapshot_identifier = "worker-final"
+    publicly_accessible       = true
+    deletion_protection = false
 }
