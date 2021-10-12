@@ -92,6 +92,10 @@ resource "aws_security_group" "ecs_sg" {
         protocol        = "tcp"
         cidr_blocks     = ["0.0.0.0/0"]
     }
+
+    tags = {
+      Name = "${var.app_name}"
+    }
 }
 
 resource "aws_security_group" "rds_sg" {
@@ -143,8 +147,9 @@ resource "aws_launch_configuration" "ecs_launch_config" {
     image_id             = "ami-094d4d00fd7462815"
     iam_instance_profile = aws_iam_instance_profile.ecs_agent.name
     security_groups      = [aws_security_group.ecs_sg.id]
-    user_data            = "#!/bin/bash\necho ECS_CLUSTER=my-cluster >> /etc/ecs/ecs.config"
+    user_data            = file("entrypoint.sh")
     instance_type        = "t2.micro"
+    associate_public_ip_address = true
 }
 
 resource "aws_autoscaling_group" "failure_analysis_ecs_asg" {
@@ -163,24 +168,51 @@ resource "aws_db_subnet_group" "db_subnet_group" {
     subnet_ids  = [aws_subnet.pub_subnet1.id, aws_subnet.pub_subnet2.id]
 }
 
-resource "aws_db_instance" "database" {
-    identifier                = "postgres"
-    allocated_storage         = 5
-    backup_retention_period   = 2
-    backup_window             = "01:00-01:30"
-    maintenance_window        = "sun:03:00-sun:03:30"
-    multi_az                  = false
-    engine                    = "postgres"
-    engine_version            = "13.4"
-    instance_class            = "db.t3.micro"
-    name                      = "${var.app_name}_db"
-    username                  = "username"
-    password                  = "password"
-    port                      = "5432"
-    db_subnet_group_name      = aws_db_subnet_group.db_subnet_group.id
-    vpc_security_group_ids    = [aws_security_group.rds_sg.id, aws_security_group.ecs_sg.id]
-    skip_final_snapshot       = true
-    final_snapshot_identifier = "worker-final"
-    publicly_accessible       = true
-    deletion_protection = false
+# resource "aws_db_instance" "database" {
+#     identifier                = "postgres"
+#     allocated_storage         = 5
+#     backup_retention_period   = 2
+#     backup_window             = "01:00-01:30"
+#     maintenance_window        = "sun:03:00-sun:03:30"
+#     multi_az                  = false
+#     engine                    = "postgres"
+#     engine_version            = "13.4"
+#     instance_class            = "db.t3.micro"
+#     name                      = "${var.app_name}_db"
+#     username                  = "username"
+#     password                  = "password"
+#     port                      = "5432"
+#     db_subnet_group_name      = aws_db_subnet_group.db_subnet_group.id
+#     vpc_security_group_ids    = [aws_security_group.rds_sg.id, aws_security_group.ecs_sg.id]
+#     skip_final_snapshot       = true
+#     final_snapshot_identifier = "worker-final"
+#     publicly_accessible       = true
+#     deletion_protection = false
+# }
+
+resource "aws_ecr_repository" "worker" {
+    name  = "${var.app_name}"
+}
+
+resource "aws_ecs_cluster" "ecs_cluster" {
+    name  = "my-cluster"
+}
+
+data "template_file" "task_definition_template" {
+    template = file("task_definition.json.tpl")
+    vars = {
+      REPOSITORY_URL = replace(aws_ecr_repository.worker.repository_url, "https://", "")
+    }
+}
+
+resource "aws_ecs_task_definition" "task_definition" {
+  family                = "${var.app_name}"
+  container_definitions = data.template_file.task_definition_template.rendered
+}
+
+resource "aws_ecs_service" "worker" {
+  name            = "${var.app_name}"
+  cluster         = aws_ecs_cluster.ecs_cluster.id
+  task_definition = aws_ecs_task_definition.task_definition.arn
+  desired_count   = 1
 }
