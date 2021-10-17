@@ -5,6 +5,7 @@
     "name": "worker",
     "cpu": 2,
     "image": "${REPOSITORY_URL}:latest",
-    "environment": []
+    "environment": [],
+    "command": ["docker", "compose", "-f", "docker-compose-production.yml", "up"]
   }
 ]
