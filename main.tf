@@ -182,27 +182,27 @@ resource "aws_db_subnet_group" "db_subnet_group" {
     subnet_ids  = [aws_subnet.pub_subnet1.id, aws_subnet.pub_subnet2.id]
 }
 
-# resource "aws_db_instance" "database" {
-#     identifier                = "postgres"
-#     allocated_storage         = 5
-#     backup_retention_period   = 2
-#     backup_window             = "01:00-01:30"
-#     maintenance_window        = "sun:03:00-sun:03:30"
-#     multi_az                  = false
-#     engine                    = "postgres"
-#     engine_version            = "13.4"
-#     instance_class            = "db.t3.micro"
-#     name                      = "${var.app_name}_db"
-#     username                  = "username"
-#     password                  = "password"
-#     port                      = "5432"
-#     db_subnet_group_name      = aws_db_subnet_group.db_subnet_group.id
-#     vpc_security_group_ids    = [aws_security_group.rds_sg.id, aws_security_group.ecs_sg.id]
-#     skip_final_snapshot       = true
-#     final_snapshot_identifier = "worker-final"
-#     publicly_accessible       = true
-#     deletion_protection = false
-# }
+resource "aws_db_instance" "database" {
+    identifier                = "postgres"
+    allocated_storage         = 5
+    backup_retention_period   = 2
+    backup_window             = "01:00-01:30"
+    maintenance_window        = "sun:03:00-sun:03:30"
+    multi_az                  = false
+    engine                    = "postgres"
+    engine_version            = "13.4"
+    instance_class            = "db.t3.micro"
+    name                      = "${var.app_name}_db"
+    username                  = "username"
+    password                  = "password"
+    port                      = "5432"
+    db_subnet_group_name      = aws_db_subnet_group.db_subnet_group.id
+    vpc_security_group_ids    = [aws_security_group.rds_sg.id, aws_security_group.ecs_sg.id]
+    skip_final_snapshot       = true
+    final_snapshot_identifier = "worker-final"
+    publicly_accessible       = true
+    deletion_protection = false
+}
 
 resource "aws_ecr_repository" "worker" {
     name  = "${var.app_name}"
@@ -215,7 +215,13 @@ resource "aws_ecs_cluster" "ecs_cluster" {
 data "template_file" "task_definition_template" {
     template = file("task_definition.json.tpl")
     vars = {
-      REPOSITORY_URL = replace(aws_ecr_repository.worker.repository_url, "https://", "")
+      REPOSITORY_URL = replace(aws_ecr_repository.worker.repository_url, "https://", ""),
+      RDS_DB_NAME = aws_db_instance.database.name,
+      RDS_USERNAME = aws_db_instance.database.username,
+      RDS_PASSWORD = "password",
+      RDS_HOSTNAME = aws_db_instance.database.address,
+      RDS_PORT = aws_db_instance.database.port,
+      RDS_URL = aws_db_instance.database.endpoint
     }
 }
 
