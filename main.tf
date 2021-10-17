@@ -143,6 +143,11 @@ resource "aws_iam_instance_profile" "ecs_agent" {
   role = aws_iam_role.ecs_agent.name
 }
 
+resource "aws_key_pair" "ssh-key" {
+  key_name = "${var.app_name}-key-pair"
+  public_key = file(var.public_key_location)
+}
+
 resource "aws_launch_configuration" "ecs_launch_config" {
     image_id             = "ami-094d4d00fd7462815"
     iam_instance_profile = aws_iam_instance_profile.ecs_agent.name
@@ -150,6 +155,8 @@ resource "aws_launch_configuration" "ecs_launch_config" {
     user_data            = file("entrypoint.sh")
     instance_type        = "t2.micro"
     associate_public_ip_address = true
+    key_name = aws_key_pair.ssh-key.key_name
+
 }
 
 resource "aws_autoscaling_group" "failure_analysis_ecs_asg" {
@@ -159,7 +166,7 @@ resource "aws_autoscaling_group" "failure_analysis_ecs_asg" {
 
     desired_capacity          = 1
     min_size                  = 1
-    max_size                  = 1
+    max_size                  = 3
     health_check_grace_period = 300
     health_check_type         = "EC2"
 }
