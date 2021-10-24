@@ -2,12 +2,13 @@
   {
     "essential": true,
     "memory": 512,
-    "name": "worker",
+    "name": "demo-web",
     "cpu": 2,
     "image": "${REPOSITORY_URL}:latest",
     "portMappings": [
       {
-        "containerPort": 3000
+        "containerPort": 3000,
+        "hostPort": 3000
       }
     ],
     "environment": [

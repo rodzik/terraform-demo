@@ -93,6 +93,13 @@ resource "aws_security_group" "ecs_sg" {
         cidr_blocks     = ["0.0.0.0/0"]
     }
 
+    ingress {
+        from_port       = 3000
+        to_port         = 3000
+        protocol        = "tcp"
+        cidr_blocks     = ["0.0.0.0/0"]
+    }
+
     egress {
         from_port       = 0
         to_port         = 65535
@@ -101,7 +108,7 @@ resource "aws_security_group" "ecs_sg" {
     }
 
     tags = {
-      Name = "${var.app_name}"
+      Name = "${var.app_name}-ecs-sg"
     }
 }
 
@@ -121,6 +128,10 @@ resource "aws_security_group" "rds_sg" {
         to_port         = 65535
         protocol        = "tcp"
         cidr_blocks     = ["0.0.0.0/0"]
+    }
+
+    tags = {
+      Name = "${var.app_name}-rds-sg"
     }
 }
 
@@ -235,4 +246,42 @@ resource "aws_ecs_service" "worker" {
   cluster         = aws_ecs_cluster.ecs_cluster.id
   task_definition = aws_ecs_task_definition.task_definition.arn
   desired_count   = 1
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.main_target_group.arn
+    container_name   = "demo-web"
+    container_port   = 3000
+  }
+}
+
+resource "aws_lb_target_group" "main_target_group" {
+  name     = "${var.app_name}-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.vpc.id
+}
+
+resource "aws_lb" "main" {
+  name               = "${var.app_name}-loadbalancer"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.ecs_sg.id]
+  subnets            = [aws_subnet.pub_subnet1.id, aws_subnet.pub_subnet2.id]
+
+  enable_deletion_protection = false
+
+  tags = {
+    Name = "${var.app_name}-loadbalancer"
+  }
+}
+
+resource "aws_lb_listener" "front_end" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.main_target_group.arn
+  }
 }
